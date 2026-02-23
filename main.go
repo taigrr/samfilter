@@ -2,72 +2,108 @@ package main
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"sort"
 	"strings"
 )
 
-// This small utility will help extract entries
-// from a SAM file and output them to a new file
-// based on a given list of read ids.
-// It expects a list of read ids as a text file as the only argument
-// and a source SAM file on stdin.
-// It will output the filtered SAM file to stdout.
 func main() {
 	if len(os.Args) != 2 {
-		log.Fatalf("please provide a list of read ids as the only argument (see help)")
+		fmt.Fprintln(os.Stderr, "usage: samfilter <read_ids.txt> < input.sam > output.sam")
+		os.Exit(1)
 	}
 	if os.Args[1] == "-h" || os.Args[1] == "--help" {
 		fmt.Println("usage: samfilter <read_ids.txt> < input.sam > output.sam")
+		fmt.Println()
+		fmt.Println("Filter a SAM file to only include reads matching the given ID list.")
+		fmt.Println("Reads a SAM file from stdin and writes filtered output to stdout.")
+		fmt.Println("Header lines (starting with @) are always passed through.")
 		os.Exit(0)
 	}
-	idList := os.Args[1]
-	samFile := os.Stdin
-	outFile := os.Stdout
-	ids := readIds(idList)
 
-	scanner := bufio.NewScanner(samFile)
-	for scanner.Scan() {
-		line := scanner.Text()
-		if line[0] == '@' {
-			fmt.Fprintln(outFile, line)
-			continue
-		}
-		fields := strings.Fields(line)
-		index := sort.SearchStrings(ids, fields[0])
-		if index < len(ids) && ids[index] == fields[0] {
-			fmt.Fprintln(outFile, line)
-		}
+	ids, err := readIDs(os.Args[1])
+	if err != nil {
+		log.Fatalf("error reading id list: %v", err)
+	}
+
+	if err := filterSAM(os.Stdin, os.Stdout, ids); err != nil {
+		log.Fatalf("error filtering SAM: %v", err)
 	}
 }
 
-// readIds reads a list of read ids from a text file
-// and returns a slice of sorted, unique ids.
-func readIds(idList string) []string {
-	idFile, err := os.Open(idList)
-	if err != nil {
-		log.Fatalf("error opening id list: %v", err)
-	}
-	defer idFile.Close()
-	var ids []string
-	scanner := bufio.NewScanner(idFile)
+// filterSAM reads SAM-formatted data from r, writes matching records to w.
+// Header lines (starting with @) are always included.
+// Data lines are included only if their QNAME (first field) is in ids.
+// ids must be sorted.
+func filterSAM(r io.Reader, w io.Writer, ids []string) error {
+	scanner := bufio.NewScanner(r)
+	// SAM files can have very long lines; set a 10MB buffer.
+	scanner.Buffer(make([]byte, 0, 64*1024), 10*1024*1024)
+
+	bw := bufio.NewWriter(w)
+	defer bw.Flush()
+
 	for scanner.Scan() {
-		ids = append(ids, scanner.Text())
-	}
-	if err := scanner.Err(); err != nil {
-		log.Fatalf("error reading id list: %v", err)
-	}
-	sort.Strings(ids)
-	if len(ids) == 0 {
-		log.Fatalf("id list is empty")
-	}
-	uniques := []string{ids[0]}
-	for i := range ids {
-		if i > 0 && ids[i-1] != ids[i] {
-			uniques = append(uniques, ids[i])
+		line := scanner.Text()
+		if len(line) == 0 {
+			continue
+		}
+		if line[0] == '@' {
+			fmt.Fprintln(bw, line)
+			continue
+		}
+		qname, _, _ := strings.Cut(line, "\t")
+		if qname == "" {
+			continue
+		}
+		if i := sort.SearchStrings(ids, qname); i < len(ids) && ids[i] == qname {
+			fmt.Fprintln(bw, line)
 		}
 	}
-	return uniques
+
+	if err := scanner.Err(); err != nil {
+		return fmt.Errorf("reading input: %w", err)
+	}
+
+	return bw.Flush()
+}
+
+// readIDs reads a list of read IDs from a text file
+// and returns a sorted slice of unique IDs.
+func readIDs(path string) ([]string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, fmt.Errorf("opening file: %w", err)
+	}
+	defer f.Close()
+
+	var ids []string
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line != "" {
+			ids = append(ids, line)
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("reading file: %w", err)
+	}
+	if len(ids) == 0 {
+		return nil, errors.New("id list is empty")
+	}
+
+	sort.Strings(ids)
+	// Deduplicate
+	uniq := ids[:1]
+	for _, id := range ids[1:] {
+		if id != uniq[len(uniq)-1] {
+			uniq = append(uniq, id)
+		}
+	}
+
+	return uniq, nil
 }
