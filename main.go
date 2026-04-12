@@ -45,11 +45,17 @@ func run(cmd *cobra.Command, args []string) error {
 	return filterSAM(os.Stdin, os.Stdout, ids)
 }
 
+// maxLineSize is the maximum line length the scanner will accept.
+// SAM records can be very long (long reads, large CIGAR strings), so
+// we use 10 MB to match what the README advertises.
+const maxLineSize = 10 * 1024 * 1024
+
 // filterSAM reads SAM-formatted lines from r and writes matching entries to w.
 // Header lines (starting with @) are always passed through. Alignment lines are
 // included only if their read ID (first field) appears in the sorted ids slice.
 func filterSAM(r io.Reader, w io.Writer, ids []string) error {
 	scanner := bufio.NewScanner(r)
+	scanner.Buffer(make([]byte, 0, maxLineSize), maxLineSize)
 	for scanner.Scan() {
 		line := scanner.Text()
 		if len(line) > 0 && line[0] == '@' {

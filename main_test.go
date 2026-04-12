@@ -122,6 +122,25 @@ func TestReadIDs_WhitespaceLines(t *testing.T) {
 	}
 }
 
+func TestFilterSAM_LongLine(t *testing.T) {
+	// Simulate a SAM record longer than the default 64KB scanner buffer.
+	longSeq := strings.Repeat("ACGT", 20000) // 80KB
+	input := "@HD\tVN:1.6\n" +
+		"read1\t0\tchr1\t100\t60\t50M\t*\t0\t0\t" + longSeq + "\t*\n" +
+		"read2\t0\tchr1\t200\t60\t50M\t*\t0\t0\tACGT\t*\n"
+
+	var buf bytes.Buffer
+	if err := filterSAM(strings.NewReader(input), &buf, []string{"read1"}); err != nil {
+		t.Fatalf("filterSAM: %v", err)
+	}
+	if !strings.Contains(buf.String(), "read1") {
+		t.Error("missing read1 with long sequence")
+	}
+	if strings.Contains(buf.String(), "read2") {
+		t.Error("should not contain read2")
+	}
+}
+
 func TestReadIDs_NotFound(t *testing.T) {
 	_, err := readIDs("/nonexistent/file.txt")
 	if err == nil {

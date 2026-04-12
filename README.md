@@ -38,4 +38,4 @@ samtools view -h input.bam | samfilter my_ids.txt > filtered.sam
 
 ## License
 
-See [LICENSE](LICENSE) (if present) or contact the author.
+[0BSD](LICENSE)
