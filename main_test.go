@@ -106,6 +106,29 @@ func TestReadIDs_Empty(t *testing.T) {
 	}
 }
 
+
+func TestReadIDs_SkipsCommentLines(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "ids.txt")
+	if err := os.WriteFile(path, []byte("# keep only these reads\nfoo\n  # another comment\nbar\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	ids, err := readIDs(path)
+	if err != nil {
+		t.Fatalf("readIDs: %v", err)
+	}
+
+	want := []string{"bar", "foo"}
+	if len(ids) != len(want) {
+		t.Fatalf("got %d ids, want %d", len(ids), len(want))
+	}
+	for i, id := range ids {
+		if id != want[i] {
+			t.Errorf("ids[%d] = %q, want %q", i, id, want[i])
+		}
+	}
+}
 func TestReadIDs_WhitespaceLines(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "ids.txt")

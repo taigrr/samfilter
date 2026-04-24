@@ -9,6 +9,7 @@ samfilter <read_ids.txt> < input.sam > output.sam
 ```
 
 - `read_ids.txt` — a text file with one read ID per line
+- Blank lines and comment lines starting with `#` are ignored
 - Reads a SAM file from stdin
 - Writes filtered SAM output to stdout
 - Header lines (`@` prefix) are always passed through
