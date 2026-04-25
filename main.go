@@ -87,9 +87,10 @@ func readIDs(path string) ([]string, error) {
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
-		if line != "" {
-			ids = append(ids, line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
 		}
+		ids = append(ids, line)
 	}
 	if err := scanner.Err(); err != nil {
 		return nil, fmt.Errorf("reading ID list: %w", err)
