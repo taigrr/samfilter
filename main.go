@@ -59,7 +59,9 @@ func filterSAM(r io.Reader, w io.Writer, ids []string) error {
 	for scanner.Scan() {
 		line := scanner.Text()
 		if len(line) > 0 && line[0] == '@' {
-			fmt.Fprintln(w, line)
+			if _, err := fmt.Fprintln(w, line); err != nil {
+				return fmt.Errorf("writing header line: %w", err)
+			}
 			continue
 		}
 		fields := strings.Fields(line)
@@ -68,7 +70,9 @@ func filterSAM(r io.Reader, w io.Writer, ids []string) error {
 		}
 		index := sort.SearchStrings(ids, fields[0])
 		if index < len(ids) && ids[index] == fields[0] {
-			fmt.Fprintln(w, line)
+			if _, err := fmt.Fprintln(w, line); err != nil {
+				return fmt.Errorf("writing alignment line: %w", err)
+			}
 		}
 	}
 	return scanner.Err()

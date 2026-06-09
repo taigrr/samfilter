@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -106,6 +107,45 @@ func TestReadIDs_Empty(t *testing.T) {
 	}
 }
 
+type errorWriter struct {
+	err error
+}
+
+func (w errorWriter) Write([]byte) (int, error) {
+	return 0, w.err
+}
+
+func TestFilterSAM_WriteHeaderError(t *testing.T) {
+	wantErr := errors.New("boom")
+	input := "@HD\tVN:1.6\n"
+
+	err := filterSAM(strings.NewReader(input), errorWriter{err: wantErr}, []string{"read1"})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "writing header line") {
+		t.Fatalf("expected header write context, got %v", err)
+	}
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("expected wrapped error %v, got %v", wantErr, err)
+	}
+}
+
+func TestFilterSAM_WriteAlignmentError(t *testing.T) {
+	wantErr := errors.New("boom")
+	input := "read1\t0\tchr1\t100\t60\t50M\t*\t0\t0\tACGT\t*\n"
+
+	err := filterSAM(strings.NewReader(input), errorWriter{err: wantErr}, []string{"read1"})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "writing alignment line") {
+		t.Fatalf("expected alignment write context, got %v", err)
+	}
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("expected wrapped error %v, got %v", wantErr, err)
+	}
+}
 
 func TestReadIDs_SkipsCommentLines(t *testing.T) {
 	dir := t.TempDir()
@@ -129,6 +169,7 @@ func TestReadIDs_SkipsCommentLines(t *testing.T) {
 		}
 	}
 }
+
 func TestReadIDs_WhitespaceLines(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "ids.txt")
