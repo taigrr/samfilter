@@ -85,6 +85,7 @@ func readIDs(path string) ([]string, error) {
 
 	var ids []string
 	scanner := bufio.NewScanner(f)
+	scanner.Buffer(make([]byte, 0, maxLineSize), maxLineSize)
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 		if line == "" || strings.HasPrefix(line, "#") {
