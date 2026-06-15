@@ -8,6 +8,7 @@ package main
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -71,7 +72,15 @@ func filterSAM(r io.Reader, w io.Writer, ids []string) error {
 			fmt.Fprintln(w, line)
 		}
 	}
-	return scanner.Err()
+
+	if err := scanner.Err(); err != nil {
+		if errors.Is(err, bufio.ErrTooLong) {
+			return fmt.Errorf("reading SAM input: line exceeds %d bytes: %w", maxLineSize, err)
+		}
+		return fmt.Errorf("reading SAM input: %w", err)
+	}
+
+	return nil
 }
 
 // readIDs reads a list of read IDs from a text file

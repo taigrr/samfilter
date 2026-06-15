@@ -1,7 +1,10 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
+	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -106,7 +109,6 @@ func TestReadIDs_Empty(t *testing.T) {
 	}
 }
 
-
 func TestReadIDs_SkipsCommentLines(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "ids.txt")
@@ -161,6 +163,45 @@ func TestFilterSAM_LongLine(t *testing.T) {
 	}
 	if strings.Contains(buf.String(), "read2") {
 		t.Error("should not contain read2")
+	}
+}
+
+type failingReader struct {
+	err error
+}
+
+func (r failingReader) Read([]byte) (int, error) {
+	return 0, r.err
+}
+
+func TestFilterSAM_ReadError(t *testing.T) {
+	wantErr := errors.New("boom")
+
+	err := filterSAM(failingReader{err: wantErr}, io.Discard, []string{"read1"})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "reading SAM input") {
+		t.Fatalf("expected SAM read context, got %v", err)
+	}
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("expected wrapped error %v, got %v", wantErr, err)
+	}
+}
+
+func TestFilterSAM_LineTooLong(t *testing.T) {
+	tooLongRead := strings.Repeat("A", maxLineSize+1)
+	input := tooLongRead + "\t0\tchr1\t100\t60\t50M\t*\t0\t0\tACGT\t*\n"
+
+	err := filterSAM(strings.NewReader(input), io.Discard, []string{tooLongRead})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "reading SAM input: line exceeds") {
+		t.Fatalf("expected line-too-long context, got %v", err)
+	}
+	if !errors.Is(err, bufio.ErrTooLong) {
+		t.Fatalf("expected bufio.ErrTooLong, got %v", err)
 	}
 }
 
