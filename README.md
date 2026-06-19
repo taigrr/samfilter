@@ -36,6 +36,7 @@ samtools view -h input.bam | samfilter my_ids.txt > filtered.sam
 - Handles whitespace and empty lines in ID files
 - 10 MB line buffer for long SAM records
 - Buffered I/O for efficient streaming
+- GitHub Actions CI running tests and staticcheck on pushes and pull requests
 
 ## License
 
