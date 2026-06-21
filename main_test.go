@@ -237,6 +237,45 @@ func TestFilterSAM_ReadError(t *testing.T) {
 	}
 }
 
+type failingWriter struct {
+	err error
+}
+
+func (w failingWriter) Write([]byte) (int, error) {
+	return 0, w.err
+}
+
+func TestFilterSAM_HeaderWriteError(t *testing.T) {
+	wantErr := errors.New("write failed")
+
+	err := filterSAM(strings.NewReader("@HD\tVN:1.6\n"), failingWriter{err: wantErr}, []string{"read1"})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "writing SAM header") {
+		t.Fatalf("expected SAM header write context, got %v", err)
+	}
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("expected wrapped error %v, got %v", wantErr, err)
+	}
+}
+
+func TestFilterSAM_RecordWriteError(t *testing.T) {
+	wantErr := errors.New("write failed")
+	input := "read1\t0\tchr1\t100\t60\t50M\t*\t0\t0\tACGT\t*\n"
+
+	err := filterSAM(strings.NewReader(input), failingWriter{err: wantErr}, []string{"read1"})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "writing SAM record") {
+		t.Fatalf("expected SAM record write context, got %v", err)
+	}
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("expected wrapped error %v, got %v", wantErr, err)
+	}
+}
+
 func TestFilterSAM_LineTooLong(t *testing.T) {
 	tooLongRead := strings.Repeat("A", maxLineSize+1)
 	input := tooLongRead + "\t0\tchr1\t100\t60\t50M\t*\t0\t0\tACGT\t*\n"

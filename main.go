@@ -60,7 +60,9 @@ func filterSAM(r io.Reader, w io.Writer, ids []string) error {
 	for scanner.Scan() {
 		line := scanner.Text()
 		if len(line) > 0 && line[0] == '@' {
-			fmt.Fprintln(w, line)
+			if _, err := fmt.Fprintln(w, line); err != nil {
+				return fmt.Errorf("writing SAM header: %w", err)
+			}
 			continue
 		}
 		readID, _, found := strings.Cut(line, "\t")
@@ -69,7 +71,9 @@ func filterSAM(r io.Reader, w io.Writer, ids []string) error {
 		}
 		index := sort.SearchStrings(ids, readID)
 		if index < len(ids) && ids[index] == readID {
-			fmt.Fprintln(w, line)
+			if _, err := fmt.Fprintln(w, line); err != nil {
+				return fmt.Errorf("writing SAM record: %w", err)
+			}
 		}
 	}
 
