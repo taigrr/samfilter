@@ -62,12 +62,12 @@ func filterSAM(r io.Reader, w io.Writer, ids []string) error {
 			fmt.Fprintln(w, line)
 			continue
 		}
-		fields := strings.Fields(line)
-		if len(fields) == 0 {
+		readID, _, found := strings.Cut(line, "\t")
+		if !found || readID == "" {
 			continue
 		}
-		index := sort.SearchStrings(ids, fields[0])
-		if index < len(ids) && ids[index] == fields[0] {
+		index := sort.SearchStrings(ids, readID)
+		if index < len(ids) && ids[index] == readID {
 			fmt.Fprintln(w, line)
 		}
 	}

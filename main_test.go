@@ -70,6 +70,26 @@ func TestFilterSAM_EmptyLines(t *testing.T) {
 	}
 }
 
+func TestFilterSAM_IgnoresSpaceSeparatedNonSAMLines(t *testing.T) {
+	input := strings.Join([]string{
+		"read1 extra tokens",
+		"read1\t0\tchr1\t100\t60\t50M\t*\t0\t0\tACGT\t*",
+	}, "\n") + "\n"
+
+	var buf bytes.Buffer
+	if err := filterSAM(strings.NewReader(input), &buf, []string{"read1"}); err != nil {
+		t.Fatalf("filterSAM: %v", err)
+	}
+
+	got := buf.String()
+	if strings.Contains(got, "read1 extra tokens") {
+		t.Error("unexpectedly included malformed space-separated line")
+	}
+	if !strings.Contains(got, "read1\t0\tchr1") {
+		t.Error("missing valid SAM record")
+	}
+}
+
 func TestReadIDs(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "ids.txt")
@@ -106,7 +126,6 @@ func TestReadIDs_Empty(t *testing.T) {
 	}
 }
 
-
 func TestReadIDs_SkipsCommentLines(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "ids.txt")
@@ -129,6 +148,7 @@ func TestReadIDs_SkipsCommentLines(t *testing.T) {
 		}
 	}
 }
+
 func TestReadIDs_WhitespaceLines(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "ids.txt")
