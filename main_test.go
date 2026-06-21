@@ -165,6 +165,33 @@ func TestReadIDs_WhitespaceLines(t *testing.T) {
 	}
 }
 
+func TestReadIDs_LongLine(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "ids.txt")
+	longID := strings.Repeat("read", 20000) // 80KB
+	if err := os.WriteFile(path, []byte(longID+"\nshort\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	ids, err := readIDs(path)
+	if err != nil {
+		t.Fatalf("readIDs: %v", err)
+	}
+	if len(ids) != 2 {
+		t.Fatalf("got %d ids, want 2", len(ids))
+	}
+	foundLongID := false
+	for _, id := range ids {
+		if id == longID {
+			foundLongID = true
+			break
+		}
+	}
+	if !foundLongID {
+		t.Errorf("long ID was not preserved")
+	}
+}
+
 func TestFilterSAM_LongLine(t *testing.T) {
 	// Simulate a SAM record longer than the default 64KB scanner buffer.
 	longSeq := strings.Repeat("ACGT", 20000) // 80KB
