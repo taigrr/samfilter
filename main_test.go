@@ -168,6 +168,36 @@ func TestReadIDs_WhitespaceLines(t *testing.T) {
 	}
 }
 
+func TestRunFilter(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "ids.txt")
+	if err := os.WriteFile(path, []byte("read1\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	input := strings.Join([]string{
+		"@HD\tVN:1.6",
+		"read1\t0\tchr1\t100\t60\t50M\t*\t0\t0\tACGT\t*",
+		"read2\t0\tchr1\t200\t60\t50M\t*\t0\t0\tACGT\t*",
+	}, "\n") + "\n"
+
+	var buf bytes.Buffer
+	if err := runFilter(path, strings.NewReader(input), &buf); err != nil {
+		t.Fatalf("runFilter: %v", err)
+	}
+
+	got := buf.String()
+	if !strings.Contains(got, "@HD\tVN:1.6") {
+		t.Fatal("missing SAM header")
+	}
+	if !strings.Contains(got, "read1\t0\tchr1") {
+		t.Fatal("missing matching read")
+	}
+	if strings.Contains(got, "read2\t0\tchr1") {
+		t.Fatal("included non-matching read")
+	}
+}
+
 func TestReadIDs_LongLine(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "ids.txt")
@@ -270,6 +300,28 @@ func TestFilterSAM_RecordWriteError(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "writing SAM record") {
 		t.Fatalf("expected SAM record write context, got %v", err)
+	}
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("expected wrapped error %v, got %v", wantErr, err)
+	}
+}
+
+func TestRunFilter_FlushError(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "ids.txt")
+	if err := os.WriteFile(path, []byte("read1\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	wantErr := errors.New("flush failed")
+	input := "read1\t0\tchr1\t100\t60\t50M\t*\t0\t0\tACGT\t*\n"
+
+	err := runFilter(path, strings.NewReader(input), failingWriter{err: wantErr})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "flushing SAM output") {
+		t.Fatalf("expected flush context, got %v", err)
 	}
 	if !errors.Is(err, wantErr) {
 		t.Fatalf("expected wrapped error %v, got %v", wantErr, err)
