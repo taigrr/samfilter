@@ -1,5 +1,9 @@
 # samfilter
 
+[![CI](https://github.com/taigrr/samfilter/actions/workflows/ci.yml/badge.svg)](https://github.com/taigrr/samfilter/actions/workflows/ci.yml)
+[![Go Reference](https://pkg.go.dev/badge/github.com/taigrr/samfilter.svg)](https://pkg.go.dev/github.com/taigrr/samfilter)
+[![Go Report Card](https://goreportcard.com/badge/github.com/taigrr/samfilter)](https://goreportcard.com/report/github.com/taigrr/samfilter)
+
 A fast, simple utility to filter [SAM](https://samtools.github.io/hts-specs/SAMv1.pdf) files by read ID.
 
 ## Usage
