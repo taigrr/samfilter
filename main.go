@@ -38,12 +38,24 @@ func main() {
 }
 
 func run(cmd *cobra.Command, args []string) error {
-	ids, err := readIDs(args[0])
+	return runFilter(args[0], os.Stdin, os.Stdout)
+}
+
+func runFilter(idPath string, input io.Reader, output io.Writer) error {
+	ids, err := readIDs(idPath)
 	if err != nil {
 		return err
 	}
 
-	return filterSAM(os.Stdin, os.Stdout, ids)
+	w := bufio.NewWriter(output)
+	if err := filterSAM(input, w, ids); err != nil {
+		return err
+	}
+	if err := w.Flush(); err != nil {
+		return fmt.Errorf("flushing SAM output: %w", err)
+	}
+
+	return nil
 }
 
 // maxLineSize is the maximum line length the scanner will accept.
