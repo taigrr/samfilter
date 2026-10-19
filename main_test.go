@@ -93,6 +93,26 @@ func TestFilterSAM_IgnoresSpaceSeparatedNonSAMLines(t *testing.T) {
 	}
 }
 
+func TestFilterSAM_IgnoresShortTabDelimitedRecords(t *testing.T) {
+	input := strings.Join([]string{
+		"read1\t0\tchr1",
+		"read1\t0\tchr1\t100\t60\t50M\t*\t0\t0\tACGT\t*",
+	}, "\n") + "\n"
+
+	var buf bytes.Buffer
+	if err := filterSAM(strings.NewReader(input), &buf, []string{"read1"}); err != nil {
+		t.Fatalf("filterSAM: %v", err)
+	}
+
+	got := buf.String()
+	if strings.Contains(got, "read1\t0\tchr1\n") {
+		t.Error("unexpectedly included short tab-delimited record")
+	}
+	if !strings.Contains(got, "read1\t0\tchr1\t100") {
+		t.Error("missing valid SAM record")
+	}
+}
+
 func TestReadIDs(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "ids.txt")

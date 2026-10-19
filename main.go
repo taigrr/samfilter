@@ -63,6 +63,8 @@ func runFilter(idPath string, input io.Reader, output io.Writer) error {
 // we use 10 MB to match what the README advertises.
 const maxLineSize = 10 * 1024 * 1024
 
+const minSAMAlignmentFields = 11
+
 // filterSAM reads SAM-formatted lines from r and writes matching entries to w.
 // Header lines (starting with @) are always passed through. Alignment lines are
 // included only if their read ID (first field) appears in the sorted ids slice.
@@ -82,10 +84,14 @@ func filterSAM(r io.Reader, w io.Writer, ids []string) error {
 			continue
 		}
 		index := sort.SearchStrings(ids, readID)
-		if index < len(ids) && ids[index] == readID {
-			if _, err := fmt.Fprintln(w, line); err != nil {
-				return fmt.Errorf("writing SAM record: %w", err)
-			}
+		if index >= len(ids) || ids[index] != readID {
+			continue
+		}
+		if strings.Count(line, "\t") < minSAMAlignmentFields-1 {
+			continue
+		}
+		if _, err := fmt.Fprintln(w, line); err != nil {
+			return fmt.Errorf("writing SAM record: %w", err)
 		}
 	}
 
