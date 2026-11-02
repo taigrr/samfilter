@@ -370,3 +370,60 @@ func TestReadIDs_NotFound(t *testing.T) {
 		t.Error("expected error for missing file")
 	}
 }
+
+func TestReadIDs_NormalizesAndDeduplicates(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "ids.txt")
+	input := "  # selected reads\r\n\r\n  zebra  \r\napple\r\nzebra\r\n\tapple\t\r\nbanana"
+	if err := os.WriteFile(path, []byte(input), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	ids, err := readIDs(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"apple", "banana", "zebra"}
+	if len(ids) != len(want) {
+		t.Fatalf("got %q, want %q", ids, want)
+	}
+	for index, id := range want {
+		if ids[index] != id {
+			t.Errorf("ids[%d] = %q, want %q", index, ids[index], id)
+		}
+	}
+}
+
+func TestReadIDs_OnlyIgnoredLines(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "ids.txt")
+	if err := os.WriteFile(path, []byte("# comment\n \t\n  # indented comment\r\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	ids, err := readIDs(path)
+	if err == nil {
+		t.Fatal("expected an error for a list containing no IDs")
+	}
+	if ids != nil {
+		t.Fatalf("returned IDs for an empty list: %q", ids)
+	}
+}
+
+func TestRunFilter_RejectsOversizedIDList(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "ids.txt")
+	// A valid ID before the oversized line must not produce partial results.
+	input := "read1\n" + strings.Repeat("A", maxLineSize+1) + "\n"
+	if err := os.WriteFile(path, []byte(input), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var output bytes.Buffer
+	sam := "@HD\tVN:1.6\nread1\t0\tchr1\t100\t60\t4M\t*\t0\t0\tACGT\t*\n"
+	err := runFilter(path, strings.NewReader(sam), &output)
+	if !errors.Is(err, bufio.ErrTooLong) {
+		t.Fatalf("expected wrapped bufio.ErrTooLong, got %v", err)
+	}
+	if !strings.Contains(err.Error(), "reading ID list") {
+		t.Fatalf("missing ID list error context: %v", err)
+	}
+	if output.Len() != 0 {
+		t.Fatalf("invalid ID list produced %d bytes of output", output.Len())
+	}
+}
