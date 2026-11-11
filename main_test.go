@@ -427,3 +427,57 @@ func TestRunFilter_RejectsOversizedIDList(t *testing.T) {
 		t.Fatalf("invalid ID list produced %d bytes of output", output.Len())
 	}
 }
+
+func TestRunFilter_StreamingWriteError(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "ids.txt")
+	if err := os.WriteFile(path, []byte("read1\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	wantErr := errors.New("output disconnected")
+	for _, test := range []struct {
+		name  string
+		input string
+		stage string
+	}{
+		{
+			name:  "header",
+			input: "@CO\t" + strings.Repeat("comment", 1000) + "\n",
+			stage: "writing SAM header",
+		},
+		{
+			name:  "record",
+			input: "read1\t0\tchr1\t100\t60\t5000M\t*\t0\t0\t" + strings.Repeat("A", 5000) + "\t*\n",
+			stage: "writing SAM record",
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			err := runFilter(path, strings.NewReader(test.input), failingWriter{err: wantErr})
+			if !errors.Is(err, wantErr) {
+				t.Fatalf("expected wrapped output error, got %v", err)
+			}
+			if !strings.Contains(err.Error(), test.stage) {
+				t.Fatalf("expected %q context, got %v", test.stage, err)
+			}
+		})
+	}
+}
+
+type shortWriter struct{}
+
+func (shortWriter) Write(data []byte) (int, error) {
+	return len(data) - 1, nil
+}
+
+func TestRunFilter_ShortWrite(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "ids.txt")
+	if err := os.WriteFile(path, []byte("read1\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	err := runFilter(path, strings.NewReader("@HD\tVN:1.6\n"), shortWriter{})
+	if !errors.Is(err, io.ErrShortWrite) {
+		t.Fatalf("expected wrapped io.ErrShortWrite, got %v", err)
+	}
+	if !strings.Contains(err.Error(), "flushing SAM output") {
+		t.Fatalf("expected flush context, got %v", err)
+	}
+}

@@ -107,12 +107,17 @@ func filterSAM(r io.Reader, w io.Writer, ids []string) error {
 
 // readIDs reads a list of read IDs from a text file
 // and returns a sorted slice of unique IDs.
-func readIDs(path string) ([]string, error) {
+func readIDs(path string) (result []string, resultErr error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, fmt.Errorf("opening ID list: %w", err)
 	}
-	defer f.Close()
+	defer func() {
+		if err := f.Close(); err != nil {
+			result = nil
+			resultErr = errors.Join(resultErr, fmt.Errorf("closing ID list: %w", err))
+		}
+	}()
 
 	var ids []string
 	scanner := bufio.NewScanner(f)
