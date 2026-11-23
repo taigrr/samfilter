@@ -63,6 +63,9 @@ func runFilter(idPath string, input io.Reader, output io.Writer) error {
 // we use 10 MB to match what the README advertises.
 const maxLineSize = 10 * 1024 * 1024
 
+// Start small and let Scanner grow only when a long line requires it.
+const initialLineBufferSize = 64 * 1024
+
 const minSAMAlignmentFields = 11
 
 // filterSAM reads SAM-formatted lines from r and writes matching entries to w.
@@ -70,7 +73,7 @@ const minSAMAlignmentFields = 11
 // included only if their read ID (first field) appears in the sorted ids slice.
 func filterSAM(r io.Reader, w io.Writer, ids []string) error {
 	scanner := bufio.NewScanner(r)
-	scanner.Buffer(make([]byte, 0, maxLineSize), maxLineSize)
+	scanner.Buffer(make([]byte, 0, initialLineBufferSize), maxLineSize)
 	for scanner.Scan() {
 		line := scanner.Text()
 		if len(line) > 0 && line[0] == '@' {
@@ -121,7 +124,7 @@ func readIDs(path string) (result []string, resultErr error) {
 
 	var ids []string
 	scanner := bufio.NewScanner(f)
-	scanner.Buffer(make([]byte, 0, maxLineSize), maxLineSize)
+	scanner.Buffer(make([]byte, 0, initialLineBufferSize), maxLineSize)
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 		if line == "" || strings.HasPrefix(line, "#") {
