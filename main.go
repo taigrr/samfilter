@@ -32,7 +32,7 @@ func main() {
 		RunE:    run,
 	}
 
-	if err := fang.Execute(context.Background(), rootCmd); err != nil {
+	if err := fang.Execute(context.Background(), rootCmd, fang.WithVersion(version)); err != nil {
 		os.Exit(1)
 	}
 }
